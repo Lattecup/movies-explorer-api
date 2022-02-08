@@ -1,4 +1,4 @@
-### Дипломный проект Яндекс.Практикум: Movies explorer (Backend)
+# Дипломный проект Яндекс.Практикум: Movies explorer (Backend)
 
 ### Ссылка на backend: https://api.movies-explorer.nomoredomains.xyz
 
