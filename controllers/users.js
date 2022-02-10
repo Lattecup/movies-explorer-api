@@ -4,27 +4,20 @@ const User = require('../models/user');
 const NotFoundError = require('../errors/NotFoundError');
 const BadRequestError = require('../errors/BadRequestError');
 const ConflictError = require('../errors/ConflictError');
-const UnauthorizedError = require('../errors/UnauthorizedError');
 
 const { NODE_ENV, JWT_SECRET } = process.env;
 
-module.exports.getUser = (req, res, next) => {
+const getUser = (req, res, next) => {
   User.findById(req.user._id)
-    .then((user) => {
-      if (!user) {
-        throw new NotFoundError('Пользователь по указанному _id не найден');
-      }
-      return res.status(200).send(user);
+    .then((user) => res.status(200).send(user))
+    .catch(() => {
+      throw new NotFoundError('Пользователь не найден');
     })
-    .catch((err) => {
-      if (err.name === 'CastError') {
-        next(new BadRequestError('Передан некорректный _id пользователя'));
-      }
-      next(err);
-    });
+    .catch(next);
 };
 
-module.exports.updateUser = (req, res, next) => {
+// По заданию: Роут обновляет информацию о пользователе (email и имя) PATCH /users/me
+const updateUser = (req, res, next) => {
   const { name, email } = req.body;
 
   User.findByIdAndUpdate(
@@ -37,50 +30,52 @@ module.exports.updateUser = (req, res, next) => {
   )
     .then((user) => {
       if (!user) {
-        throw new NotFoundError('Пользователь по указанному _id не найден');
+        throw new NotFoundError('Пользователь не найден');
+      } else {
+        res.status(200).send(user);
       }
-      return res.status(200).send(user);
     })
     .catch((err) => {
+      if (err.code === 11000) {
+        throw new ConflictError('Пользователь уже существует');
+      } else
       if (err.name === 'ValidationError') {
-        next(new BadRequestError('Переданы некорректные данные при обновлении информации о пользователе'));
+        throw new NotFoundError('Данные пользователя не найдены');
+      } else {
+        next(err);
       }
-      next(err);
-    });
+    })
+    .catch(next);
 };
 
-module.exports.createUser = (req, res, next) => {
+const createUser = (req, res, next) => {
   const { name, email, password } = req.body;
 
-  User.findOne({ email })
-    .then((user) => {
-      if (user) {
-        throw new ConflictError('Пользователь с указанным email уже существует');
-      }
-      return bcrypt.hash(password, 10);
-    })
-    .then((hash) => {
-      User.create({
-        name, email, password: hash,
-      })
-        .then(() => res.status(200).send({
-          user: {
-            name, email,
-          },
-        }));
-    })
+  bcrypt.hash(password, 10)
+    .then((hash) => User.create({
+      name, email, password: hash,
+    }))
+    .then(() => res.status(200).send({
+      user: {
+        name, email,
+      },
+    }))
     .catch((err) => {
       if (err.name === 'ValidationError') {
-        next(new BadRequestError('Переданы некорректные данные при создании пользователя'));
+        throw new BadRequestError('Переданы некорректные данные при создании пользователя');
+      } else if (err.name === 11000) {
+        throw new ConflictError('Пользователь с указанным email уже существует');
+      } else {
+        next(err);
       }
-      next(err);
-    });
+    })
+    .catch(next);
 };
 
-module.exports.login = (req, res, next) => {
+const login = (req, res, next) => {
   const { email, password } = req.body;
 
-  return User.findUserByCredentials(email, password)
+  User.findUserByCredentials(email, password)
     .then((user) => {
       const token = jwt.sign({ _id: user._id }, NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret', { expiresIn: '7d' });
       return res
@@ -88,18 +83,16 @@ module.exports.login = (req, res, next) => {
           maxAge: 3600000 * 24 * 7,
           httpOnly: true,
           sameSite: 'None',
-          secure: true,
         })
         .send({ token });
     })
-    .catch((err) => {
-      if (err.name === 'ValidationError') {
-        next(new UnauthorizedError('Введен неверный логин или пароль'));
-      }
-      next(err);
-    });
+    .catch(next);
 };
 
-module.exports.logout = (req, res) => {
+const logout = (req, res) => {
   res.clearCookie('token').status(200).send({ message: 'До новых встреч!' });
+};
+
+module.exports = {
+  getUser, updateUser, createUser, login, logout,
 };

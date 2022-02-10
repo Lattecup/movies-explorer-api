@@ -3,13 +3,16 @@ const NotFoundError = require('../errors/NotFoundError');
 const BadRequestError = require('../errors/BadRequestError');
 const ForbiddenError = require('../errors/ForbiddenError');
 
-module.exports.getAllMovies = (req, res, next) => {
+const getAllMovies = (req, res, next) => {
   Movie.find({})
     .then((movies) => res.status(200).send(movies))
+    .catch((err) => {
+      next(err);
+    })
     .catch(next);
 };
 
-module.exports.createMovie = (req, res, next) => {
+const createMovie = (req, res, next) => {
   const owner = req.user._id;
   const {
     country,
@@ -18,7 +21,7 @@ module.exports.createMovie = (req, res, next) => {
     year,
     description,
     image,
-    trailer,
+    trailerLink,
     thumbnail,
     movieId,
     nameRU,
@@ -32,7 +35,7 @@ module.exports.createMovie = (req, res, next) => {
     year,
     description,
     image,
-    trailer,
+    trailerLink,
     thumbnail,
     movieId,
     nameRU,
@@ -43,27 +46,24 @@ module.exports.createMovie = (req, res, next) => {
     .catch((err) => {
       if (err.name === 'ValidationError') {
         next(new BadRequestError('Переданы некорректные данные при создании фильма'));
+      } else {
+        next(err);
       }
-      next(err);
-    });
+    })
+    .catch(next);
 };
 
-module.exports.deleteMovie = (req, res, next) => {
+const deleteMovie = (req, res, next) => {
   Movie.findById(req.params._id)
+    .orFail(new NotFoundError('Фильм не найден'))
     .then((movie) => {
-      if (!movie) {
-        throw new NotFoundError('Фильм по указанному _id не найден');
+      if (movie.owner.toString() === req.user._id) {
+        return movie.remove()
+          .then(() => res.status(200).send(movie));
       }
-      if (!movie.owner.toString() === req.user._id.toString()) {
-        throw new ForbiddenError('Удалять чужие фильмы запрещено');
-      }
-      return movie.remove()
-        .then(() => res.status(200).send(movie));
+      throw new ForbiddenError('Удалять чужие фильмы запрещено');
     })
-    .catch((err) => {
-      if (err.name === 'CastError') {
-        next(new BadRequestError('Передан некорректный _id фильма'));
-      }
-      next(err);
-    });
+    .catch(next);
 };
+
+module.exports = { getAllMovies, createMovie, deleteMovie };
