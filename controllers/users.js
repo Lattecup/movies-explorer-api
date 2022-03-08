@@ -16,7 +16,6 @@ const getUser = (req, res, next) => {
     .catch(next);
 };
 
-// По заданию: Роут обновляет информацию о пользователе (email и имя) PATCH /users/me
 const updateUser = (req, res, next) => {
   const { name, email } = req.body;
 
@@ -55,10 +54,9 @@ const createUser = (req, res, next) => {
     .then((hash) => User.create({
       name, email, password: hash,
     }))
-    .then((user) => res.status(200).send({
-      data: {
-        name: user.name,
-        email: user.email,
+    .then(() => res.status(200).send({
+      user: {
+        name, email,
       },
     }))
     .catch((err) => {
