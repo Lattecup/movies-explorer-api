@@ -89,9 +89,8 @@ const login = (req, res, next) => {
     .catch(next);
 };
 
-const logout = (req, res) => {
-  res.clearCookie('token').status(200).send({ message: 'До новых встреч!' });
-};
+const logout = (req, res) => res.clearCookie('token')
+  .status(200).send();
 
 module.exports = {
   getUser, updateUser, createUser, login, logout,
